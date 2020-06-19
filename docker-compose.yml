@@ -1,0 +1,66 @@
+version: '3'
+services:
+  zookeeper:
+    container_name: zookeeper
+    image: zookeeper
+    restart: always
+    hostname: zoo1
+    ports:
+      - 2181:2181
+    environment:
+      ZOO_MY_ID: 1
+  schema-reg:
+    image: confluentinc/cp-schema-registry:latest
+    container_name: schema-reg
+    environment:
+      SCHEMA_REGISTRY_KAFKASTORE_BOOTSTRAP_SERVERS: PLAINTEXT://kafka:29092
+      SCHEMA_REGISTRY_HOST_NAME: schema-reg
+      SCHEMA_REGISTRY_LISTENERS: http://0.0.0.0:8081
+    links:
+      - zookeeper
+    depends_on:
+      - zookeeper
+    ports:
+      - "8081:8081"
+  kafka:
+    image: confluentinc/cp-kafka:latest
+    container_name: kafka
+    links:
+      - zookeeper
+    depends_on:
+      - zookeeper
+    environment:
+      KAFKA_BROKER_ID: 2
+      KAFKA_NUM_PARTITIONS: 4
+      KAFKA_ZOOKEEPER_CONNECT: zookeeper:2181
+      KAFKA_LISTENERS: LISTENER_BOB://kafka:29092,LISTENER_FRED://0.0.0.0:9092
+      KAFKA_ADVERTISED_LISTENERS: LISTENER_BOB://kafka:29092,LISTENER_FRED://localhost:9092
+      KAFKA_LISTENER_SECURITY_PROTOCOL_MAP: LISTENER_BOB:PLAINTEXT,LISTENER_FRED:PLAINTEXT
+      KAFKA_INTER_BROKER_LISTENER_NAME: LISTENER_BOB
+      KAFKA_OFFSETS_TOPIC_REPLICATION_FACTOR: 1
+    ports:
+      - '9092:9092'
+  kafka-rest:
+    image: confluentinc/cp-kafka-rest
+    container_name: kafka-rest
+    links:
+      - kafka
+    depends_on:
+      - kafka
+    ports:
+      - '8082:8082'
+    environment:
+      KAFKA_REST_BOOTSTRAP_SERVERS: PLAINTEXT://kafka:29092
+      KAFKA_REST_HOST_NAME: kafka-rest
+  kafka-ui:
+    image: landoop/kafka-topics-ui
+    container_name: kafka-ui
+    links:
+      - kafka-rest
+    depends_on:
+      - kafka-rest
+    ports:
+      - '9000:8000'
+    environment:
+      KAFKA_REST_PROXY_URL: http://kafka-rest:8082
+      PROXY: "true"
